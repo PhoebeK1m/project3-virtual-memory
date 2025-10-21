@@ -116,7 +116,7 @@ tid_t process_execute (const char *file_name)
     // load failed
     list_remove(&cs->elem);
     cs->parent_alive = false;
-    palloc_free_page(cs);
+    // palloc_free_page(cs);
     return TID_ERROR;
   }
 
