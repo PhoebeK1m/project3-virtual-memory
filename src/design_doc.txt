@@ -1,0 +1,329 @@
+                     +--------------------------+
+                     |           CS 439         |
+                     | PROJECT 2: USER PROGRAMS |
+                     |      DESIGN DOCUMENT     |
+                     +--------------------------+
+
+
+For this design document, please *each* submit the header, but you do not need
+to fill out the questions.  We will cover all questions (in content, if not in
+form) in the interview.
+
+When you have completed the header, submit it to the Canvas assignment
+Project 2 Design and Documentation.  ***Your submission must be a text file and
+each line must not extend past 80 characters.  (Note that rtf files are NOT text
+files.)
+
+
+---- Name ----
+
+>> Fill your name, UT EID, CS login, email address, and unique number:
+
+Name: Alisha Madhuvarshi
+EID: am232478
+CS login: am429
+Email: almadhuvarshi@gmail.com
+Unique Number: 54880
+
+Slip days used on this project: 0
+
+
+---- GROUP ----
+
+>> Fill the names, UT EIDs, CS logins, email addresses, and unique numbers
+>> of your group members.  Also fill in each person's ranking on the 
+>> partner evaluation scale, as determined by you.
+
+Name: Alisha Madhuvarshi
+EID: am232478
+CS login: am429
+Email: almadhuvarshi@gmail.com
+Unique Number: 54880
+
+Name: Phoebe Kim
+EID: ek23486
+CS login: phoebek
+Email: phoebekim12006@gmail.com
+Unique Number: 54880
+
+Name: Tony Zhu
+EID: tzz65
+CS login: zhutony
+Email: zhu.tony@utexas.edu
+Unique Number: 54880
+
+
+---- PRELIMINARIES ----
+
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+>>
+
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+>>
+
+
+>> Please paste a link to your GitLab repo below.
+>> https://github.com/am429/os-project-02
+
+
+
+                           ARGUMENT PASSING
+                           ================
+
+
+---- DATA STRUCTURES ----
+
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', â€˜#defineâ€™, or
+>> enumeration that was necessary to implement argument passing.  
+>> Identify the purpose of each in 25 words or less.
+>> 
+
+
+---- ALGORITHMS ----
+
+
+>> A2: Briefly describe how you implemented argument parsing.  How do
+>> you arrange for the elements of argv[] to be in the right order?
+>> How do you avoid overflowing the stack page?  Is it enough to limit
+>> the size of the incoming commandline?  Why or Why not?
+>> In process_execute the command line is parsed using strtok_r(), splitting
+the input string by whitespace into tokens. Up to 128 args are stored in
+exec_info's argv array. The setup stack function pushes the arguments onto the
+stack in reverse order s.t. they are correct in memory. They are then aligned,
+a null sentinel is added, arg pointers are implemented, argc and a fake return
+address. You can't just limit the command size as the pointers, padding,
+and additional stack setup data adds to the stack. We avoid overflowing the stack
+page by constantly checking of the stack pointer is below the bottom of its page.
+
+
+---- RATIONALE ----
+
+
+>> A3: Why does Pintos implement strtok_r() but not strtok()?
+>> strtok_r() includes an additional argument, save_ptr,
+which stores the state of the string being parsed to
+prevent race conditions, as multiple processes could be
+scanning the same string.
+
+
+>> A4: In Pintos, the kernel separates commands into an executable name
+>> and arguments.  In Unix-like systems, the shell does this
+>> separation.  Identify at least two advantages of the Unix approach.
+>> In the case of an error, only the shell will crash in Unix. However,
+in Pintos, an error could lead to a kernel crash. Also, it is easier
+to customize shells, because you can use things like bash or zsh, but
+it is more difficult to customize the kernel.
+
+
+                             SYSTEM CALLS
+                             ============
+
+
+---- DATA STRUCTURES ----
+
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', â€˜#defineâ€™, or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+>>
+
+// record for parent to keep track of child thread
+struct child_status {
+  tid_t tid;
+  int exit_status;
+  bool exited;
+  bool waited;
+  bool parent_alive;
+
+  bool load_ok;
+  struct semaphore load_sema;
+
+  struct semaphore wait_sema;
+
+  struct list_elem elem;
+};
+
+contains info for synchronization and parent + child tracking
+
+struct child_status *child_rec;   /* Back-pointer to our status record (set by parent). */
+
+// for executable tracking
+struct file* executable;
+
+// for exit
+int exit_status;
+
+// parent/child
+struct list children;
+
+fields added in thread to help with parent child & executables
+
+
+>> B2: Describe how file descriptors are associated with open files.
+>> Are file descriptors unique within the entire OS or just within a
+>> single process?
+>> A file descriptor is a unique integer that tracks an open
+file. Each process has its own file descriptor table which
+associates different files with their own file descriptors.
+This is only within the process, so file descriptors are
+not unique to the OS.
+
+
+---- ALGORITHMS ----
+
+
+>> B3: Describe your code for accessing user data in the
+>> kernel.
+>> We implemented a method that checks if the user
+provided pointer is valid. It cannot be null, in
+kernel virtual address space, or not be in
+the current thread's page directory. We also
+validate the buffer range by checking the
+first and last byte of the buffer to ensure
+they are valid. We always validate these
+in our system calls with input provided
+by the user. 
+
+
+>> B4: Suppose a system call causes a full page (4,096 bytes) of data
+>> to be copied from user space into the kernel.  Based on your code, 
+>> what is the least and the greatest possible number of inspections of 
+>> the page table (e.g. calls to pagedir_get_page()) that might result?  
+>> What about for a system call that only copies 2 bytes of data?  Is there 
+>> room for improvement in these numbers, and how much?
+>> The least and greatest possible number of
+inspections of the page table will be 2. We
+always make 2 inspections, for the first and 
+last byte. For a system call that copies 2
+bytes of data, we will inspect the page table
+twice. Only one inspection is necessary, so
+there is room for improvement.
+
+
+>> B5: Any access to user program memory at a user-specified address
+>> can fail due to a bad pointer value.  Such accesses must cause the
+>> process to be terminated.  System calls are fraught with such
+>> accesses, e.g. a "write" system call requires reading the system
+>> call number from the user stack, then each of the call's three
+>> arguments, then an arbitrary amount of user memory, and any of
+>> these can fail at any point.  This poses a design and
+>> error-handling problem: how do you best avoid obscuring the primary
+>> function of code in a morass of error-handling?  Furthermore, when
+>> an error is detected, how do you ensure that all temporarily
+>> allocated resources (locks, buffers, etc.) are freed?  In a few
+>> sentences, describe the strategy or strategies you adopted for
+>> managing these issues.  Give an example.
+>> In our code, we perform preliminary checks before writing
+or reading from a file, such as if the file is null, or if
+our pointers and buffers are valid. If an error occurs, then
+before returning, we make sure to release the lock and only 
+then return. For example, in the read system call, we 
+validate that buffer is not null, that it is not in kernel 
+virtual address space, and that the buffer is valid. 
+Then, we check that the file to read from is not null. 
+If it is, we release the lock, and only after releasing do 
+we return an error status. 
+
+
+---- SYNCHRONIZATION ----
+
+
+>> B6: Briefly describe your implementation of the "wait" system call
+>> and how it interacts with process termination.
+>> sys_wait calls process_wait which searches the parent thread's children
+list for a child_status struct matching the child_tid. If found and it hasn't
+yet been waited on, the child gets marked as waited and the parent blocks via 
+a wait_sema until the child exits. In process_exit, it updates its exit status
+in the record and unblocks the wait sema to wake the parent. The parent then
+gets the exit status, removes the child from the list, frees the record, and
+returns that exit status.
+
+
+>> B7: Consider parent process P with child process C.  Explain how
+>> how your code ensures synchronization and avoids race conditions
+>> in each of the following cases:
+>> a) when P calls wait(C) before C exits?
+P blocks via sema_down of the wait_sema, and then gets unblcoked upon C's 
+process_exit
+
+>> b) when P calls wait(C) after C exits?
+Since C has already exited it's called sema_up on the wait sema, so P won't
+block.
+
+>> c) when P terminates without waiting before C exits?
+We use a parent_alive flag that gets set to false in C when P terminates so 
+that it frees its own child_status as opposed to signaling to a dead parent
+
+>> d) when P terminates without waiting after C exits?  
+After C exit the exited field is set to true. Now when P termiantes it'll 
+check that C has exited and free its child status struct, cleaning everything up.
+
+>> e) Are there any special cases?
+Implementation prevents a double wait using the waited flag, returning -1
+if this tries to happen
+
+
+>> B8: The "exec" system call returns -1 if loading the new executable
+>> fails, so it cannot return before the new executable has completed
+>> loading.  How does your code ensure this?  How is the load
+>> success/failure status passed back to the thread that calls "exec"?
+>> Load success/failure is stored in the child status struct's load_ok
+flag. The parent checks this field and will return -1 based on its outcome.
+
+
+---- RATIONALE ----
+
+
+>> B9: What advantages or disadvantages can you see to your design
+>> for file descriptors?
+>> An advantage would be its simplicity as each thread has its own fd list,
+however it might not be the most efficient as you need to linear search
+through the entire list during get_file
+
+
+>> B10: The default tid_t to pid_t mapping is the identity mapping.
+>> If you changed it, what advantages are there to your approach?
+>> Did not change tid_t to pid_t mapping
+
+
+                           SURVEY QUESTIONS
+                           ================
+
+
+Answering these questions is optional, but it will help us improve the
+course in future semesters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the semester.
+
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+>>
+
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+>>
+
+
+>> Is there some particular fact or hint we should give students in
+>> future semesters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+>>
+
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future semesters or the remaining projects?
+>>
+
+
+>> Any other comments?
+>>
