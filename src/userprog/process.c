@@ -216,10 +216,12 @@ void process_exit(void) {
 
   // close the executable file
   if (curr->executable != NULL) {
+    lock_acquire(&file_lock);
     // allow writes since no longer running
     file_allow_write(curr->executable);
     // close file
     file_close(curr->executable);
+    lock_release(&file_lock);
     curr->executable = NULL; // get rid of link
   }
 
@@ -372,16 +374,20 @@ static bool load (struct exec_info *info, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  lock_acquire(&file_lock);
+
   /* Open executable file. */
   file = filesys_open (info->filename);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", info->filename);
+      lock_release(&file_lock);
       goto done;
     }
 
   file_deny_write(file);
   t->executable = file; 
+  lock_release(&file_lock);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr ||
@@ -466,7 +472,9 @@ done:
   /* We arrive here whether the load is successful or not. */
   // CHANGE THIS: Don't close the file if successful - we need to keep it open
   if (!success && file != NULL) {
+    lock_acquire(&file_lock);
     file_close(file);
+    lock_release(&file_lock);
     t->executable = NULL;
   }
   // If success, file stays open and assigned to t->executable

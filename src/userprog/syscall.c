@@ -48,7 +48,7 @@ void sys_seek(int fd, unsigned position);
 unsigned sys_tell(int fd);
 void sys_close(int fd);
 
-static struct lock file_lock;
+// static struct lock file_lock;
 
 // get 32 bits from user mem to kernel
 static bool fetch_u32 (const void *uaddr, uint32_t *dst) {
@@ -167,7 +167,7 @@ static bool valid_user_range(const void *buffer, unsigned size) {
 void syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init(&file_lock);
+  // lock_init(&file_lock);
 }
 
 static void syscall_handler (struct intr_frame *f)
